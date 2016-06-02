@@ -44,11 +44,11 @@ describe('hadron-auto-update-manager', () => {
           AutoUpdateManager = mock.reRequire('../');
         });
 
-        it('should eventually go into `no-update-available` state', function(done) {
+        it('should eventually go into `update-not-available` state', function(done) {
           const endpoint = 'https://hadron-endpoint.herokuapp.com';
           const autoUpdateManager = new AutoUpdateManager(endpoint);
           autoUpdateManager.on('state-changed', function(state) {
-            if (state === 'no-update-available') {
+            if (state === 'update-not-available') {
               done();
             }
           });

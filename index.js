@@ -24,7 +24,7 @@ const CheckingState = 'checking';
 const UpdateAvailableState = 'update-available';
 const DownloadingState = 'downloading';
 const UpdateDownloadedState = 'update-downloaded';
-const NoUpdateAvailableState = 'no-update-available';
+const NoUpdateAvailableState = 'update-not-available';
 const UnsupportedState = 'unsupported';
 const ErrorState = 'error';
 
