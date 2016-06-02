@@ -163,7 +163,7 @@ AutoUpdateManager.prototype.setupAutoUpdater = function() {
       return this.setState(UnsupportedState);
     }
     debug('Error Downloading Update: ' + message);
-    return this.setState(ErrorState);
+    return this.setState(ErrorState, message);
   });
 
   autoUpdater.setFeedURL(this.feedURL);
@@ -244,7 +244,7 @@ AutoUpdateManager.prototype.checkForUpdates = function(opts) {
     autoUpdateMgr.emitEventToAllWindows('app:update-available');
   }).on('error', function(e) {
     debug('error while checking for update', e);
-    autoUpdateMgr.setState(ErrorState);
+    autoUpdateMgr.setState(ErrorState, e);
   });
 };
 
