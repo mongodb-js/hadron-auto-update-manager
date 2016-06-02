@@ -243,6 +243,7 @@ AutoUpdateManager.prototype.checkForUpdates = function(opts) {
     autoUpdateMgr.setState(UpdateAvailableState);
     autoUpdateMgr.emitEventToAllWindows('app:update-available');
   }).on('error', function(e) {
+    debug('error while checking for update', e);
     autoUpdateMgr.setState(ErrorState);
   });
 };
@@ -295,7 +296,8 @@ AutoUpdateManager.prototype.setState = function(state) {
   }
   this.state = state;
   debug('state is now', state);
-  return this.emit('state-changed', state);
+  this.emit('state-changed', state);
+  this.emit(state);
 };
 
 /**
