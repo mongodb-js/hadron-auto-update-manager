@@ -70,11 +70,6 @@ function AutoUpdateManager(endpointURL, iconURL) {
   this.state = IdleState;
   this.feedURL = `${endpointURL}/update?version=${this.version}&platform=${process.platform}&arch=${process.arch}`;
 
-  debug('auto updater ready and waiting.', {
-    version: this.version,
-    feedURL: this.feedURL
-  });
-
   process.nextTick(() => {
     this.setupAutoUpdater();
   });
@@ -191,10 +186,6 @@ AutoUpdateManager.prototype.setupAutoUpdater = function() {
 
   autoUpdater.setFeedURL(this.feedURL);
 
-  // autoUpdater.on('checking-for-update', () => {
-  //   this.setState(CheckingState);
-  // });
-
   autoUpdater.on('update-not-available', () => {
     this.setState(NoUpdateAvailableState);
   });
@@ -250,14 +241,24 @@ AutoUpdateManager.prototype.cancelScheduledUpdateCheck = function() {
  * check manually via https.get() if an update is available now, but
  * don't download it yet.
  *
+ * @api private
+ * @param  {Object} opts   options object, can have `hidePopups` boolean field
+ *                         to indicate whether a popup should be shown to give
+ *                         user feedback.
  * @return {Boolean}       returns true
  */
 AutoUpdateManager.prototype.checkForUpdates = function(opts) {
   var autoUpdateMgr = this;
   autoUpdateMgr.setState(CheckingState);
 
+  opts = opts || {};
+  if (!opts.hidePopups) {
+    autoUpdateMgr.once('update-not-available', this.onUpdateNotAvailable);
+    autoUpdateMgr.once('error', this.onUpdateError);
+  }
+
   // send request to server
-  https.get(this.feedURL, function(res) {
+  https.get(this.feedURL + '&download=false', function(res) {
     if (res.statusCode === HTTP_NO_CONTENT) {
       // no updates available
       return autoUpdateMgr.setState(NoUpdateAvailableState);
@@ -272,20 +273,17 @@ AutoUpdateManager.prototype.checkForUpdates = function(opts) {
 /**
  * check if update available and automatically download it.
  *
+ * @api private
  * @param  {Object} opts   options object, can have `hidePopups` boolean field
  *                         to indicate whether a popup should be shown to give
  *                         user feedback.
- *
  * @return {Boolean}       returns true
  */
 AutoUpdateManager.prototype.checkAndDownload = function(opts) {
-  debug('checkForUpdates with options', opts);
   opts = opts || {};
   if (!opts.hidePopups) {
-    autoUpdater.once('update-not-available', this.onUpdateNotAvailable);
     autoUpdater.once('error', this.onUpdateError);
   }
-  debug('checking for updates...');
   autoUpdater.checkForUpdates();
   return true;
 };
@@ -294,6 +292,7 @@ AutoUpdateManager.prototype.checkAndDownload = function(opts) {
  * Sets the current state of the auto updater state machine and emits
  * a `state-changed` event. No-op if the state remains the same.
  *
+ * @api private
  * @param  {String} state   new state
  * @return {[type]}         returns true if the event had listeners, false
  *                          otherwise.
@@ -303,13 +302,14 @@ AutoUpdateManager.prototype.setState = function(state) {
     return;
   }
   this.state = state;
-  debug('state is now', state);
   this.emit('state-changed', state);
   this.emit(state);
 };
 
 /**
  * get current state of the auto updater state machine.
+ *
+ * @api private
  * @return {String}  current state.
  */
 AutoUpdateManager.prototype.getState = function() {
@@ -320,11 +320,13 @@ AutoUpdateManager.prototype.getState = function() {
  * if opts.hidePopups was not set for `checkForUpdates`, this method
  * will inform the user with a popup dialog that there was no update available.
  *
+ * @api private
  * @return {Number}   returns the index of the clicked button, see
  * https://github.com/electron/electron/blob/master/docs/api/dialog.md
  */
 AutoUpdateManager.prototype.onUpdateNotAvailable = function() {
   debug('update not available', arguments);
+  this.removeListener('error', this.onUpdateError);
   autoUpdater.removeListener('error', this.onUpdateError);
   return dialog.showMessageBox({
     type: 'info',
@@ -341,12 +343,13 @@ AutoUpdateManager.prototype.onUpdateNotAvailable = function() {
  * will inform the user with a popup dialog that there was an error checking
  * for updates.
  *
+ * @api private
  * @return {Number}   returns the index of the clicked button, see
  * https://github.com/electron/electron/blob/master/docs/api/dialog.md
  */
 AutoUpdateManager.prototype.onUpdateError = function(event, message) {
   debug('update error', arguments);
-  autoUpdater.removeListener('update-not-available', this.onUpdateNotAvailable);
+  this.removeListener('update-not-available', this.onUpdateNotAvailable);
   return dialog.showMessageBox({
     type: 'warning',
     buttons: ['OK'],

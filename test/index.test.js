@@ -52,7 +52,7 @@ describe('hadron-auto-update-manager', () => {
               done();
             }
           });
-          autoUpdateManager.checkForUpdates();
+          autoUpdateManager.checkForUpdates({hidePopups: true});
         });
       });
 
@@ -82,7 +82,7 @@ describe('hadron-auto-update-manager', () => {
               done();
             }
           });
-          autoUpdateManager.checkForUpdates();
+          autoUpdateManager.checkForUpdates({hidePopups: true});
         });
       });
     });
