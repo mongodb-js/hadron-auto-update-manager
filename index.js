@@ -1,6 +1,28 @@
 'use strict';
 
-/* eslint eqeqeq: 1, no-console:0 no-else-return: 1, no-cond-assign: 1, consistent-return: 1 */
+/**
+ * This module is a wrapper around Electron's auto-updater that adds additional
+ * features like "check before you download" and some convenience methods.
+ *
+ * @see https://github.com/electron/electron/blob/master/docs/api/auto-updater.md
+ * @see https://medium.com/@svilen/auto-updating-apps-for-windows-and-osx-using-electron-the-complete-guide-4aa7a50b904c#.q793uggoq
+ *
+ * The main issue with Electron's auto-updater is that once you run `.checkForUpdates()`,
+ * there is no going back. If a newer version is available, it will go fetch the
+ * binary, download and install it. We don't want this behavior, instead we'd
+ * like to get user confirmation first before we download, and again before we
+ * restart the application.
+ *
+ * Therefore this module checks for a newer version first (with a https.get()
+ * request) and re-wires some of the existing events.
+ */
+
+/* eslint eqeqeq: 1,
+   no-console:0,
+   no-else-return: 1,
+   no-cond-assign: 1,
+   consistent-return: 1 */
+
 const path = require('path');
 const fs = require('fs');
 const _ = require('lodash');
@@ -13,8 +35,7 @@ const dialog = electron.dialog;
 const app = electron.app;
 const autoUpdater = require('./auto-updater');
 
-// const debug = require('debug')('hadron-auto-update-manager');
-const debug = console.log;
+const debug = require('debug')('hadron-auto-update-manager');
 
 /*
  * States of the auto updater state machine
@@ -29,8 +50,8 @@ const UnsupportedState = 'unsupported';
 const ErrorState = 'error';
 
 const ENOSIGNATURE = 'Could not get code signature for running application';
-
 const HTTP_NO_CONTENT = 204;
+
 /**
  * Constructor
  *
@@ -60,7 +81,6 @@ function AutoUpdateManager(endpointURL, iconURL) {
 }
 _.extend(AutoUpdateManager.prototype, EventEmitter.prototype);
 
-
 /**
  * Enable auto updates with interval checks (every 4 hours) for new updates.
  *
@@ -88,7 +108,9 @@ AutoUpdateManager.prototype.disable = function() {
 };
 
 /**
- * checks for updates now bypassing scheduled check.
+ * checks for updates now (but don't download), bypassing scheduled check.
+ * The state will transition into `checking` during the check, and then
+ * either `update-available` or `update-not-available`.
  *
  * @api public
  * @return {Boolean}  returns false if there was a problem, true if check
@@ -105,7 +127,8 @@ AutoUpdateManager.prototype.check = function() {
 
 /**
  * downloads the available update. Should only be called if in
- * `update-available` state.
+ * `update-available` state. Changes into state `downloading` during the
+ * download and into `download-available` after completion.
  *
  * @api public
  * @return {Boolean}  returns false if there was a problem, true if check
@@ -125,7 +148,7 @@ AutoUpdateManager.prototype.download = function() {
 
 /**
  * Install new update if it is available. Can only be executed if state is
- * `download-available`.
+ * `update-downloaded`. Will quit and restart the application.
  *
  * @api public
  * @return {Boolean}   returns false if no update is abvailable, true if
@@ -182,7 +205,6 @@ AutoUpdateManager.prototype.setupAutoUpdater = function() {
     this.releaseNotes = releaseNotes;
     this.releaseVersion = releaseVersion;
     this.setState(UpdateDownloadedState);
-    this.emitEventToAllWindows('app:update-downloaded');
   });
 };
 
@@ -241,7 +263,6 @@ AutoUpdateManager.prototype.checkForUpdates = function(opts) {
       return autoUpdateMgr.setState(NoUpdateAvailableState);
     }
     autoUpdateMgr.setState(UpdateAvailableState);
-    autoUpdateMgr.emitEventToAllWindows('app:update-available');
   }).on('error', function(e) {
     debug('error while checking for update', e);
     autoUpdateMgr.setState(ErrorState, e);
@@ -267,19 +288,6 @@ AutoUpdateManager.prototype.checkAndDownload = function(opts) {
   debug('checking for updates...');
   autoUpdater.checkForUpdates();
   return true;
-};
-
-
-AutoUpdateManager.prototype.emitEventToAllWindows = function(evt, meta) {
-  if (!this.releaseVersion) {
-    return;
-  }
-  BrowserWindow.getAllWindows().forEach((_browserWindow) => {
-    debug('sending %s', evt);
-    if (_browserWindow.webContents) {
-      _browserWindow.webContents.send(evt, meta);
-    }
-  });
 };
 
 /**
@@ -324,7 +332,7 @@ AutoUpdateManager.prototype.onUpdateNotAvailable = function() {
     icon: this.iconURL,
     message: 'No update available.',
     title: 'No Update Available',
-    detail: 'You\'re running the latest version of N1 (' + this.version + ').'
+    detail: 'You\'re running the latest version (' + this.version + ').'
   });
 };
 
