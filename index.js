@@ -68,7 +68,12 @@ function AutoUpdateManager(endpointURL, iconURL) {
   this.onUpdateError = _.bind(this.onUpdateError, this);
   this.onUpdateNotAvailable = _.bind(this.onUpdateNotAvailable, this);
   this.state = IdleState;
-  this.feedURL = `${endpointURL}/update?version=${this.version}&platform=${process.platform}&arch=${process.arch}`;
+  // TODO hack to get to the RELEASES file for windows updates
+  if (process.platform === 'win32') {
+    this.feedURL = `${endpointURL}/update/${process.platform}/${this.version}/RELEASES`;
+  } else {
+    this.feedURL = `${endpointURL}/update?version=${this.version}&platform=${process.platform}&arch=${process.arch}`;    
+  }
 
   process.nextTick(() => {
     this.setupAutoUpdater();
