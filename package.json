@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "debug": "^2.2.0",
-    "got": "^6.3.0",
+    "got": "^10.4.0",
     "lodash": "^4.11.1"
   },
   "devDependencies": {
